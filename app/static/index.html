@@ -69,6 +69,9 @@
             <option value="heart">❤ Heart</option>
           </select>
         </label>
+        <label class="overlay-toggle" title="Overlay the depression circuit correlome (CBCT circuit map)">
+          <input type="checkbox" id="dz-toggle" /> Depression circuit
+        </label>
       </div>
 
       <!-- Collapsible side panel toggle -->
@@ -118,6 +121,20 @@
     </div>
   </aside>
   <div id="scrim" class="scrim hidden"></div>
+
+  <!-- ---------- HORIZON context download modal ---------- -->
+  <div id="horizon-modal" class="hz-modal hidden" aria-hidden="true">
+    <div class="hz-card">
+      <div class="hz-brand">◇ HORIZON</div>
+      <h2 id="hz-title">Patient</h2>
+      <p class="hz-sub">Cross-system patient context is available for this patient.</p>
+      <button id="hz-download" class="hz-btn">⤓ Download HORIZON context</button>
+      <div id="hz-progress" class="hz-progress hidden">
+        <div class="hz-bar"><i id="hz-bar-fill"></i></div>
+        <div id="hz-status" class="hz-status">Connecting…</div>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/vendor/three.min.js"></script>
   <script src="/static/vendor/OrbitControls.js"></script>

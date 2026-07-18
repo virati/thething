@@ -78,13 +78,57 @@ async function selectRecord(folder) {
   ]);
   state.record = rec;
   state.regions = regions || [];
-  renderRecord();
-  $("#pane-record").classList.remove("hidden");
-  // regions live on the brain
-  $("#organ-select").value = "brain";
-  renderAnatomy();
-  // make sure the panel is open so the record is visible
-  if ($("#stage").classList.contains("collapsed")) sideToggle.click();
+  // Gate the render behind a simulated "HORIZON context" download.
+  openHorizon(rec, () => {
+    renderRecord();
+    $("#pane-record").classList.remove("hidden");
+    $("#organ-select").value = "brain"; // regions live on the brain
+    renderAnatomy();
+    if ($("#stage").classList.contains("collapsed")) sideToggle.click();
+  });
+}
+
+// --------------------------------------------------------------------------- //
+// HORIZON context download (popup + ~5s status bar)                           //
+// --------------------------------------------------------------------------- //
+function openHorizon(rec, onReady) {
+  const modal = $("#horizon-modal");
+  const btn = $("#hz-download");
+  $("#hz-title").textContent = rec.name;
+  $("#hz-progress").classList.add("hidden");
+  $("#hz-bar-fill").style.width = "0%";
+  btn.classList.remove("hidden");
+  modal.classList.remove("hidden");
+  btn.onclick = () => {
+    btn.classList.add("hidden");
+    $("#hz-progress").classList.remove("hidden");
+    runHorizonProgress(() => {
+      modal.classList.add("hidden");
+      onReady();
+    });
+  };
+}
+
+function runHorizonProgress(done) {
+  const fill = $("#hz-bar-fill");
+  const status = $("#hz-status");
+  const steps = [
+    [8, "Connecting to HORIZON…"],
+    [26, "Pulling encounters & clinical notes…"],
+    [46, "Reconciling medications…"],
+    [66, "Restoring middle-zone context…"],
+    [86, "Mapping brain regions of concern…"],
+    [100, "Context packaged."],
+  ];
+  let i = 0;
+  const perStep = 5000 / steps.length; // ~5s total
+  (function next() {
+    if (i >= steps.length) return setTimeout(done, 250);
+    const [pct, msg] = steps[i++];
+    fill.style.width = pct + "%";
+    status.textContent = msg;
+    setTimeout(next, perStep);
+  })();
 }
 
 function renderRecord() {
@@ -159,6 +203,7 @@ function section(title, text) {
 }
 
 $("#organ-select").addEventListener("change", renderAnatomy);
+$("#dz-toggle").addEventListener("change", renderAnatomy);
 
 // Collapsible side panel
 const sideToggle = $("#side-toggle");
@@ -286,7 +331,11 @@ function renderAnatomy() {
   // regions of concern (explicit 3D coords) apply to the brain of the active record
   const regions = organ === "brain" ? (state.regions || []) : [];
 
-  window.Anatomy3D.render($("#anatomy"), { focus: organ, annotations, regions });
+  // depression-circuit correlome overlay (ported from rseeg do_map_overlay)
+  const dzOn = $("#dz-toggle").checked && organ === "brain";
+  const overlay = dzOn ? { url: "/static/assets/depression_map.glb", color: 0xff3fae } : null;
+
+  window.Anatomy3D.render($("#anatomy"), { focus: organ, annotations, regions, overlay });
 
   $("#imaging-notes").innerHTML = imaging
     .map(

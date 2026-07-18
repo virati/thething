@@ -186,7 +186,7 @@
     const tex = new T.CanvasTexture(cv);
     tex.anisotropy = 4;
     const spr = new T.Sprite(new T.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-    spr.scale.set((cv.width / cv.height) * 0.34, 0.34, 1);
+    spr.scale.set((cv.width / cv.height) * 0.12, 0.12, 1);
     spr.renderOrder = 10;
     return spr;
   }
@@ -241,8 +241,46 @@
     });
   }
 
+  // Translucent volumetric overlay (e.g. the depression-circuit correlome
+  // isosurface). Baked into the same normalized space as the brain, so it just
+  // scales by `fit`. Cached; silently skipped if the asset is missing.
+  const overlayCache = {};
+  function addOverlay(group, overlay, fit) {
+    if (!overlay || !overlay.url || !T.GLTFLoader) return;
+    const build = (geo) => {
+      if (!active || active.group !== group) return;
+      const mat = new T.MeshStandardMaterial({
+        color: overlay.color, emissive: overlay.color, emissiveIntensity: 0.55,
+        transparent: true, opacity: 0.32, side: T.DoubleSide,
+        depthWrite: false, roughness: 0.5, metalness: 0.0,
+      });
+      const mesh = new T.Mesh(geo, mat);
+      mesh.scale.setScalar(fit);
+      mesh.renderOrder = 2;
+      group.add(mesh);
+      active.disposables.push(mat);
+    };
+    if (overlayCache[overlay.url]) return build(overlayCache[overlay.url]);
+    new T.GLTFLoader().load(
+      overlay.url,
+      (gltf) => {
+        let g = null;
+        gltf.scene.traverse((o) => {
+          if (o.isMesh && !g) {
+            o.updateWorldMatrix(true, false);
+            g = o.geometry.clone();
+            g.applyMatrix4(o.matrixWorld);
+          }
+        });
+        if (g) { g.computeVertexNormals(); overlayCache[overlay.url] = g; build(g); }
+      },
+      undefined,
+      () => { /* missing/failed overlay — skip silently */ }
+    );
+  }
+
   // ---- Render ------------------------------------------------------------ //
-  function render(container, { focus, annotations, regions }) {
+  function render(container, { focus, annotations, regions, overlay }) {
     dispose();
     const isBrain = focus === "brain";
     const width = container.clientWidth || 340;
@@ -276,7 +314,10 @@
       organ.meshes.forEach((m) => group.add(m));
       active.disposables.push(...organ.disposables);
       addMarkers(group, isBrain, annotations, organ.fit);
-      if (isBrain) addRegions(group, regions, organ.fit);
+      if (isBrain) {
+        addRegions(group, regions, organ.fit);
+        addOverlay(group, overlay, organ.fit);
+      }
     };
 
     const controls = new T.OrbitControls(camera, renderer.domElement);

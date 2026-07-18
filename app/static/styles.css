@@ -94,7 +94,17 @@ body {
 /* ---------- Stage (main = glass brain) + collapsible side panel ---------- */
 .stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 
-.stage-controls { position: absolute; top: 14px; left: 14px; z-index: 3; }
+.stage-controls {
+  position: absolute; top: 14px; left: 14px; z-index: 3;
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+}
+.overlay-toggle {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  font-size: 12px; color: var(--text);
+  background: #0d1526cc; backdrop-filter: blur(8px);
+  border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px;
+}
+.overlay-toggle input { accent-color: #ff3fae; }
 
 .side-panel {
   position: absolute; top: 0; right: 0; height: 100%;
@@ -222,6 +232,33 @@ body {
 .portal-type {
   text-transform: uppercase; letter-spacing: .05em; color: var(--accent); font-weight: 600;
 }
+
+/* ---------- HORIZON download modal ---------- */
+.hz-modal {
+  position: fixed; inset: 0; z-index: 30; display: grid; place-items: center;
+  background: #060a13cc; backdrop-filter: blur(4px); padding: 20px;
+}
+.hz-card {
+  width: min(420px, 92vw); background: var(--card); border: 1px solid var(--line);
+  border-radius: 18px; padding: 26px; text-align: center; box-shadow: 0 30px 80px #0009;
+}
+.hz-brand { font-weight: 800; letter-spacing: .2em; color: var(--accent); font-size: 13px; }
+.hz-card h2 { margin: 10px 0 4px; font-size: 20px; }
+.hz-sub { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
+.hz-btn {
+  width: 100%; padding: 13px; border: 0; border-radius: 12px; cursor: pointer;
+  font-size: 15px; font-weight: 700; color: #08101f;
+  background: linear-gradient(135deg, var(--accent), var(--brain));
+}
+.hz-btn:hover { filter: brightness(1.05); }
+.hz-progress { margin-top: 6px; }
+.hz-bar { height: 8px; border-radius: 999px; background: #0e1729; overflow: hidden; }
+.hz-bar > i {
+  display: block; height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--accent), var(--brain));
+  transition: width .45s ease;
+}
+.hz-status { margin-top: 10px; color: var(--muted); font-size: 12.5px; min-height: 1.1em; }
 
 /* ---------- Drawer ---------- */
 .scrim { position: fixed; inset: 0; background: #0008; z-index: 20; }
