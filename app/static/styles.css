@@ -132,7 +132,7 @@ body {
 
 .pane {
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 16px; min-height: 0;
+  padding: 16px; min-height: 0; min-width: 0; overflow-wrap: anywhere;
 }
 .side-panel .portal-list { grid-template-columns: 1fr; }
 .pane-title { margin: 0; font-size: 16px; }
@@ -147,7 +147,9 @@ body {
 .conv-list { display: flex; flex-direction: column; gap: 10px; }
 .conv {
   background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+  min-width: 0;
 }
+.conv summary .src-name { min-width: 0; overflow-wrap: anywhere; }
 .conv summary {
   list-style: none; cursor: pointer; padding: 12px 14px; display: flex; align-items: center; gap: 10px;
 }
@@ -160,7 +162,7 @@ body {
 .conv-body { padding: 0 14px 14px; }
 .sub { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
 .sub h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-.transcript { white-space: pre-wrap; font-size: 13px; color: #cdd8f2; background: #0e1729; border-radius: 8px; padding: 10px; }
+.transcript { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; font-size: 13px; color: #cdd8f2; background: #0e1729; border-radius: 8px; padding: 10px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .chip { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
 .chip.affect { color: var(--warn); border-color: #4a3d1e; }

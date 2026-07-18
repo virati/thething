@@ -27,6 +27,7 @@ app/
 scripts/
   generate_stories.py   Builds up to 20 synthetic stories
   fetch_brain_mesh.py   Bakes a real BrainGlobe/brainrender brain mesh -> brain.glb
+  bake_dz_map.py        Bakes a CBCT correlome isosurface -> depression_map.glb
 main.py            Convenience launcher (uvicorn)
 ```
 
@@ -142,6 +143,25 @@ two hemispheres, orients it upright, normalizes/decimates, and writes
 with the same glass material; if the file is absent (or the surface can't be
 fetched), it silently falls back to the procedural brain. The dependencies are
 ephemeral (`--with`) and are **not** added to the app's runtime.
+
+### Depression-circuit overlay (CBCT correlome) — optional
+
+The **"depression circuit"** toggle on the brain drapes a translucent isosurface
+of a CBCT circuit map (correlome) over the glass brain — ported from rseeg's
+`do_map_overlay.py` / `smooth_contour_actor_scalar`. Bake it into an overlay
+asset once:
+
+```bash
+uv run --with nibabel --with scipy --with scikit-image --with nilearn \
+       --with trimesh --with fast-simplification python scripts/bake_dz_map.py
+```
+
+This masks the correlome (`|value| > 3`, matching `show_dz_map=3`), smooths it,
+runs marching cubes to an isosurface, applies the NIfTI affine to MNI/RAS space,
+and **co-registers it into `brain.glb`'s normalized frame** (same fsaverage
+orient/center/scale), writing `app/static/assets/depression_map.glb`. Point at a
+different map with `--map`/`--threshold`/`--out`. If the asset is absent the app
+simply skips the overlay. Dependencies are ephemeral and not in the app runtime.
 
 ## Regenerating / editing data
 
