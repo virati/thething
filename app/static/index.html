@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <title>MCP for Health — Patient Advocate</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <!-- ---------- Auth screen (mock) ---------- -->
+  <section id="auth" class="auth">
+    <div class="auth-card">
+      <div class="brand">
+        <span class="brand-mark">✦</span>
+        <div>
+          <h1>MCP for Health</h1>
+          <p class="tagline">The agentic advocate that carries your story between visits.</p>
+        </div>
+      </div>
+
+      <div class="consent">
+        <h2>Authorize access</h2>
+        <p>The Advocate will read your conversations and imaging to prepare
+           context for your care team. Nothing is shared without your consent.</p>
+        <ul class="scopes">
+          <li>Care-team call transcripts &amp; affect</li>
+          <li>Claude / ChatGPT health chats</li>
+          <li>Diagnostic imaging (heart / brain)</li>
+        </ul>
+      </div>
+
+      <button id="signin" class="google-btn">
+        <span class="g">G</span> Sign in with Google
+        <span class="connector">· Claude Connector</span>
+      </button>
+      <p class="mock-note">Prototype — mock authorization, no real account is used.</p>
+    </div>
+  </section>
+
+  <!-- ---------- App ---------- -->
+  <main id="app" class="app hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="brand-mark small">✦</span>
+        <strong>MCP for Health</strong>
+      </div>
+      <div class="topbar-mid">
+        <label for="patient-select" class="sr-only">Patient</label>
+        <select id="patient-select"></select>
+      </div>
+      <div class="topbar-right">
+        <button id="package-btn" class="pill">Package context →</button>
+      </div>
+    </header>
+
+    <div class="panes">
+      <!-- Conversations pane -->
+      <section class="pane" id="pane-conversations">
+        <h2 class="pane-title">Conversations</h2>
+        <p class="pane-sub">Phone calls, chatbots — the middle zones between visits.</p>
+        <div id="conversations-list" class="conv-list"></div>
+      </section>
+
+      <!-- Anatomy pane -->
+      <section class="pane" id="pane-anatomy">
+        <h2 class="pane-title">Anatomy</h2>
+        <p class="pane-sub">Template + patient-specific imaging overlays.</p>
+        <div id="anatomy" class="anatomy"></div>
+        <div id="imaging-notes" class="imaging-notes"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- ---------- Context package drawer ---------- -->
+  <aside id="drawer" class="drawer hidden" aria-hidden="true">
+    <div class="drawer-inner">
+      <div class="drawer-head">
+        <h2>Context package for the clinician</h2>
+        <button id="drawer-close" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="toggle-row">
+        <button class="toggle active" data-view="without">Without middle zones</button>
+        <button class="toggle" data-view="with">With middle zones</button>
+      </div>
+      <div id="package-body" class="package-body"></div>
+    </div>
+  </aside>
+  <div id="scrim" class="scrim hidden"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,7 +1,13 @@
 [project]
 name = "thething"
 version = "0.1.0"
-description = "Add your description here"
+description = "MCP for Health — an agentic patient advocate that carries the patient's story between visits."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+]
+
+[tool.setuptools]
+packages = ["app"]
