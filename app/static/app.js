@@ -39,9 +39,12 @@ async function selectPatient(id) {
   const res = await fetch(`/api/patients/${id}`);
   state.patient = await res.json();
   state.package = null;
+  $("#organ-select").value = state.patient.focus || "heart";
   renderConversations();
   renderAnatomy();
 }
+
+$("#organ-select").addEventListener("change", renderAnatomy);
 
 // --------------------------------------------------------------------------- //
 // Conversations pane                                                          //
@@ -95,37 +98,17 @@ function renderConversations() {
 }
 
 // --------------------------------------------------------------------------- //
-// Anatomy pane                                                                //
+// Anatomy / Imaging pane (3D)                                                 //
 // --------------------------------------------------------------------------- //
-const HEART_PATH =
-  "M50 78 C 20 55, 18 28, 36 22 C 46 19, 50 30, 50 34 C 50 30, 54 19, 64 22 C 82 28, 80 55, 50 78 Z";
-const BRAIN_PATH =
-  "M30 40 C 26 26, 44 18, 50 26 C 56 18, 74 26, 70 40 C 78 44, 76 60, 64 64 C 62 74, 46 76, 40 68 C 28 68, 24 50, 30 40 Z";
-
 function renderAnatomy() {
-  const focus = state.patient.focus || "heart";
+  const organ = $("#organ-select").value || state.patient.focus || "heart";
   const imaging = state.patient.imaging || [];
-  const pins = imaging.flatMap((img) => img.annotations || []);
-  const path = focus === "brain" ? BRAIN_PATH : HEART_PATH;
-  const cls = focus === "brain" ? "organ-brain" : "organ-heart";
+  // markers come from imaging for the selected organ
+  const annotations = imaging
+    .filter((img) => (img.region || state.patient.focus) === organ)
+    .flatMap((img) => img.annotations || []);
 
-  const pinSvg = pins
-    .map(
-      (p) => `
-      <g class="pin">
-        <circle class="halo" cx="${p.x}" cy="${p.y}" r="4.5"></circle>
-        <circle cx="${p.x}" cy="${p.y}" r="1.6"></circle>
-        <text x="${p.x + 3}" y="${p.y + 1}">${escapeHtml(p.label)}</text>
-      </g>`
-    )
-    .join("");
-
-  $("#anatomy").innerHTML = `
-    <svg viewBox="0 0 100 100" role="img" aria-label="${focus} template with overlays">
-      <path class="${cls}" d="${path}" stroke-width="1.4"></path>
-      ${brainDetail(focus)}
-      ${pinSvg}
-    </svg>`;
+  window.Anatomy3D.render($("#anatomy"), { focus: organ, annotations });
 
   $("#imaging-notes").innerHTML = imaging
     .map(
@@ -136,13 +119,6 @@ function renderAnatomy() {
       </div>`
     )
     .join("");
-}
-
-function brainDetail(focus) {
-  if (focus === "brain")
-    return `<path class="organ-brain organ-line" d="M50 26 C 50 40, 48 55, 50 68" stroke-width="0.8"></path>`;
-  // heart: a couple of vessel hints
-  return `<path class="organ-heart organ-line" d="M50 34 L50 20 M50 24 C 44 20, 40 24, 42 30" stroke-width="0.8"></path>`;
 }
 
 // --------------------------------------------------------------------------- //

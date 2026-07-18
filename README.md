@@ -20,7 +20,9 @@ app/
   server.py        FastAPI app: JSON API + serves the SPA
   advocate.py      The Advocate — rule-based context packager (LLM seam)
   data/            Generated synthetic patient stories (JSON)
-  static/          Dependency-free SPA (index.html, app.js, styles.css)
+  static/          SPA (index.html, app.js, styles.css)
+    anatomy3d.js   3D heart/brain renderer (marker overlays, orbit controls)
+    vendor/        Three.js r128 + OrbitControls, vendored so the app is offline
 scripts/
   generate_stories.py   Builds up to 20 synthetic stories
 main.py            Convenience launcher (uvicorn)
@@ -70,8 +72,9 @@ uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
    or **James Okafor** — neuro; these are the hand-authored "hero" stories).
 3. **Conversations pane** — expand a phone call or chat to see the transcript
    plus extracted **affect**, sentiment, engagement, and unmet needs.
-4. **Anatomy pane** — a heart or brain template with patient-specific imaging
-   overlays and findings.
+4. **Anatomy / Imaging pane** — an interactive **3D** heart or brain (drag to
+   rotate, auto-spins) with patient-specific marker overlays and imaging
+   findings. Use the **organ dropdown** (❤ Heart / 🧠 Brain) to switch models.
 5. Click **"Package context →"** to open the Advocate brief. Toggle between
    **Without middle zones** (what the clinic sees today) and **With middle
    zones** (engagement score, unmet needs, between-visit highlights, and

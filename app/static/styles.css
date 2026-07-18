@@ -100,6 +100,11 @@ body {
 }
 .pane-title { margin: 0; font-size: 16px; }
 .pane-sub { margin: 2px 0 14px; color: var(--muted); font-size: 12px; }
+.pane-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.organ-picker select {
+  background: var(--card); color: var(--text); border: 1px solid var(--line);
+  border-radius: 10px; padding: 7px 10px; font-size: 13px; cursor: pointer;
+}
 
 /* ---------- Conversations ---------- */
 .conv-list { display: flex; flex-direction: column; gap: 10px; }
@@ -128,14 +133,14 @@ body {
 .meter > i { display: block; height: 100%; background: linear-gradient(90deg, var(--bad), var(--warn), var(--good)); }
 
 /* ---------- Anatomy ---------- */
-.anatomy { display: grid; place-items: center; padding: 8px; }
-.anatomy svg { width: min(340px, 100%); height: auto; }
-.organ-heart { fill: #2a1420; stroke: var(--heart); }
-.organ-brain { fill: #1e1630; stroke: var(--brain); }
-.organ-line { fill: none; stroke-opacity: .5; }
-.pin circle { fill: var(--accent); stroke: #08101f; stroke-width: 1.2; }
-.pin text { fill: var(--text); font-size: 3.4px; }
-.pin .halo { fill: var(--accent); opacity: .18; }
+.anatomy {
+  display: grid; place-items: center; padding: 4px;
+  min-height: 300px;
+  background: radial-gradient(320px 240px at 50% 40%, #17223a 0%, transparent 70%);
+  border-radius: 12px;
+}
+.anatomy canvas { width: 100% !important; height: auto !important; touch-action: none; cursor: grab; }
+.anatomy canvas:active { cursor: grabbing; }
 .imaging-notes { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .img-note { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .img-note b { font-size: 13px; }

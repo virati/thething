@@ -62,10 +62,21 @@
         <div id="conversations-list" class="conv-list"></div>
       </section>
 
-      <!-- Anatomy pane -->
+      <!-- Anatomy / Imaging pane -->
       <section class="pane" id="pane-anatomy">
-        <h2 class="pane-title">Anatomy</h2>
-        <p class="pane-sub">Template + patient-specific imaging overlays.</p>
+        <div class="pane-head">
+          <div>
+            <h2 class="pane-title">Anatomy / Imaging</h2>
+            <p class="pane-sub">3D template + patient-specific imaging overlays. Drag to rotate.</p>
+          </div>
+          <label class="organ-picker">
+            <span class="sr-only">Organ</span>
+            <select id="organ-select">
+              <option value="heart">❤ Heart</option>
+              <option value="brain">🧠 Brain</option>
+            </select>
+          </label>
+        </div>
         <div id="anatomy" class="anatomy"></div>
         <div id="imaging-notes" class="imaging-notes"></div>
       </section>
@@ -88,6 +99,9 @@
   </aside>
   <div id="scrim" class="scrim hidden"></div>
 
+  <script src="/static/vendor/three.min.js"></script>
+  <script src="/static/vendor/OrbitControls.js"></script>
+  <script src="/static/anatomy3d.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>
