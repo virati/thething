@@ -46,8 +46,10 @@
         <strong>MCP for Health</strong>
       </div>
       <div class="topbar-mid">
-        <label for="patient-select" class="sr-only">Patient</label>
-        <select id="patient-select"></select>
+        <label for="record-select" class="sr-only">Patient record</label>
+        <select id="record-select" title="Real patient records (data/patients)"></select>
+        <label for="patient-select" class="sr-only">Synthetic story</label>
+        <select id="patient-select" title="Synthetic demo stories"></select>
       </div>
       <div class="topbar-right">
         <button id="package-btn" class="pill">Package context →</button>
@@ -72,8 +74,14 @@
       <!-- Collapsible side panel toggle -->
       <button id="side-toggle" class="side-toggle" aria-label="Collapse panel" aria-expanded="true">›</button>
 
-      <!-- Collapsible side panel: conversations, portal, imaging -->
+      <!-- Collapsible side panel: record, conversations, portal, imaging -->
       <aside id="side-panel" class="side-panel">
+        <section class="pane hidden" id="pane-record">
+          <h2 class="pane-title">Patient Record</h2>
+          <p class="pane-sub">All information from <code>data/patients</code> — demographics, longitudinal summary, and every encounter's note, transcript &amp; after-visit summary.</p>
+          <div id="record-body"></div>
+        </section>
+
         <section class="pane" id="pane-conversations">
           <h2 class="pane-title">Conversations</h2>
           <p class="pane-sub">Phone calls, chatbots — the middle zones between visits.</p>

@@ -2,7 +2,7 @@
 
 const $ = (sel) => document.querySelector(sel);
 
-const state = { patient: null, package: null, view: "without" };
+const state = { patient: null, package: null, view: "without", record: null, regions: [] };
 
 // --------------------------------------------------------------------------- //
 // Auth (mock)                                                                 //
@@ -11,6 +11,7 @@ $("#signin").addEventListener("click", async () => {
   $("#auth").classList.add("hidden");
   $("#app").classList.remove("hidden");
   await loadPatients();
+  await loadRecords();
 });
 
 // --------------------------------------------------------------------------- //
@@ -43,6 +44,118 @@ async function selectPatient(id) {
   renderConversations();
   renderPortal();
   renderAnatomy();
+}
+
+// --------------------------------------------------------------------------- //
+// Real patient records (data/patients)                                        //
+// --------------------------------------------------------------------------- //
+async function loadRecords() {
+  const sel = $("#record-select");
+  let records = [];
+  try {
+    records = await (await fetch("/api/records")).json();
+  } catch (_) { /* no records */ }
+  const opts = ['<option value="">— Patient record —</option>'];
+  records.forEach((r) => {
+    const who = `${r.name}${r.age != null ? ` · ${r.age}${(r.gender || "")[0] || ""}` : ""}`;
+    opts.push(`<option value="${r.folder}">📁 ${who} · ${r.headline || ""}</option>`);
+  });
+  sel.innerHTML = opts.join("");
+  sel.addEventListener("change", () => selectRecord(sel.value));
+}
+
+async function selectRecord(folder) {
+  if (!folder) {
+    state.record = null;
+    state.regions = [];
+    $("#pane-record").classList.add("hidden");
+    renderAnatomy();
+    return;
+  }
+  const [rec, regions] = await Promise.all([
+    fetch(`/api/records/${folder}`).then((r) => r.json()),
+    fetch(`/api/records/${folder}/regions`).then((r) => r.json()),
+  ]);
+  state.record = rec;
+  state.regions = regions || [];
+  renderRecord();
+  $("#pane-record").classList.remove("hidden");
+  // regions live on the brain
+  $("#organ-select").value = "brain";
+  renderAnatomy();
+  // make sure the panel is open so the record is visible
+  if ($("#stage").classList.contains("collapsed")) sideToggle.click();
+}
+
+function renderRecord() {
+  const r = state.record;
+  const ls = r.longitudinal_summary || {};
+  const demo = [
+    ["DOB", r.birthDate], ["Age", r.age], ["Sex", r.gender],
+    ["Marital", r.marital], ["Location", r.address], ["Language", r.language],
+  ].filter(([, v]) => v != null && v !== "");
+
+  const counts = Object.entries(ls.resource_counts || {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `<span class="chip">${escapeHtml(k)} ${v}</span>`)
+    .join("");
+
+  const regionCards = (state.regions || [])
+    .map((rg) => `
+      <div class="region-row sev-${escapeHtml(rg.severity || "low")}">
+        <div class="region-dot"></div>
+        <div><b>${escapeHtml(rg.label)}</b><p>${escapeHtml(rg.reason || "")}</p></div>
+      </div>`)
+    .join("");
+
+  const encounters = (r.encounters || [])
+    .map((e, i) => `
+      <details class="conv" ${i === r.encounters.length - 1 ? "open" : ""}>
+        <summary>
+          <span class="chev">▶</span>
+          <span class="src-name">${escapeHtml(e.visit_title || e.visit_type || "Encounter")}</span>
+          <span class="src-meta">${escapeHtml((e.date || "").slice(0, 10))}</span>
+        </summary>
+        <div class="conv-body">
+          ${e.note ? section("Clinical note", e.note) : ""}
+          ${e.transcript ? section("Visit transcript", e.transcript) : ""}
+          ${e.after_visit_summary ? section("After-visit summary", e.after_visit_summary) : ""}
+        </div>
+      </details>`)
+    .join("");
+
+  $("#record-body").innerHTML = `
+    <div class="rec-head">
+      <div class="rec-name">${escapeHtml(r.name)}</div>
+      <div class="chips">${demo.map(([k, v]) => `<span class="chip"><b>${escapeHtml(k)}</b> ${escapeHtml(String(v))}</span>`).join("")}</div>
+    </div>
+
+    <div class="rec-block">
+      <h4>Problem list <span class="muted">(${(ls.condition_labels || []).length})</span></h4>
+      <ul class="rec-list">${(ls.condition_labels || []).map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul>
+    </div>
+
+    <div class="rec-block">
+      <h4>Medications <span class="muted">(${(ls.medication_labels || []).length})</span></h4>
+      <ul class="rec-list">${(ls.medication_labels || []).map((m) => `<li>${escapeHtml(m)}</li>`).join("")}</ul>
+    </div>
+
+    ${regionCards ? `<div class="rec-block"><h4>Brain — regions of concern</h4>${regionCards}</div>` : ""}
+
+    <div class="rec-block">
+      <h4>Longitudinal record</h4>
+      <div class="chips">${counts}</div>
+    </div>
+
+    <div class="rec-block">
+      <h4>Encounters <span class="muted">(${(r.encounters || []).length})</span></h4>
+      <div class="conv-list">${encounters}</div>
+    </div>`;
+}
+
+function section(title, text) {
+  return `<div class="sub"><h4>${escapeHtml(title)}</h4>
+    <div class="transcript">${escapeHtml(text)}</div></div>`;
 }
 
 $("#organ-select").addEventListener("change", renderAnatomy);
@@ -160,14 +273,20 @@ function renderPortal() {
 // Anatomy / Imaging pane (3D)                                                 //
 // --------------------------------------------------------------------------- //
 function renderAnatomy() {
-  const organ = $("#organ-select").value || state.patient.focus || "heart";
-  const imaging = state.patient.imaging || [];
-  // markers come from imaging for the selected organ
-  const annotations = imaging
-    .filter((img) => (img.region || state.patient.focus) === organ)
-    .flatMap((img) => img.annotations || []);
+  const organ = $("#organ-select").value || (state.patient && state.patient.focus) || "brain";
+  const imaging = (state.patient && state.patient.imaging) || [];
+  // markers come from imaging for the selected organ (suppressed when a real
+  // record is active — its brain shows the regions of concern instead)
+  const annotations = state.record
+    ? []
+    : imaging
+        .filter((img) => (img.region || (state.patient && state.patient.focus)) === organ)
+        .flatMap((img) => img.annotations || []);
 
-  window.Anatomy3D.render($("#anatomy"), { focus: organ, annotations });
+  // regions of concern (explicit 3D coords) apply to the brain of the active record
+  const regions = organ === "brain" ? (state.regions || []) : [];
+
+  window.Anatomy3D.render($("#anatomy"), { focus: organ, annotations, regions });
 
   $("#imaging-notes").innerHTML = imaging
     .map(

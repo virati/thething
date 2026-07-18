@@ -85,18 +85,42 @@ uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
      results, scheduling, forms, and billing, each with type, direction, and
      status (e.g. a diuretic refill left *pending* over a copay).
    - **Imaging / Findings** — the studies behind the anatomy view.
-5. Click **"Package context →"** to open the Advocate brief. Toggle between
+5. **Patient record dropdown** (blue, top bar) — lists every real patient folder
+   under `data/patients/`. Selecting one opens a **Patient Record** section in the
+   side panel with **all** their information: demographics, problem list,
+   medications, longitudinal resource counts, and every encounter's clinical
+   **note**, **transcript**, and **after-visit summary**. It also drops
+   **regions-of-concern dots** on the glass brain (colored by severity) based on
+   that patient's clinical presentation — defined in the side file
+   `data/regions_of_concern.json`.
+6. Click **"Package context →"** to open the Advocate brief. Toggle between
    **Without middle zones** (what the clinic sees today) and **With middle
    zones** (engagement score, unmet needs, between-visit highlights, and
    "ask the right questions sooner" prompts). That contrast is the pitch.
+
+## Real patient records (`data/patients/`)
+
+Drop a patient folder under `data/patients/<name>/` containing a
+`*_full_trajectory.json` (a list of encounters, each with `metadata`,
+`patient_context`, `transcript`, `note`, `after_visit_summary` — the Synthea/FHIR
+shape used by `data/patients/howell/`). It appears automatically in the **Patient
+record** dropdown; no code changes needed.
+
+Brain **regions of concern** live in the side file `data/regions_of_concern.json`,
+keyed by folder name — each dot has a `label`, `reason`, `severity`
+(`high`/`moderate`/`low`), and `x`/`y`/`z` in normalized brain-model space. Edit
+that file to change the dots.
 
 ## API
 
 | Method | Path | Description |
 | ------ | ---- | ----------- |
-| GET | `/api/patients` | List all patients (from `index.json`) |
-| GET | `/api/patients/{id}` | Full patient story |
+| GET | `/api/patients` | List synthetic demo stories (from `index.json`) |
+| GET | `/api/patients/{id}` | Full synthetic story |
 | GET | `/api/patients/{id}/package` | Advocate context package (with/without views) |
+| GET | `/api/records` | List real patient folders under `data/patients/` |
+| GET | `/api/records/{folder}` | Full record (demographics, summary, encounters) |
+| GET | `/api/records/{folder}/regions` | Brain regions of concern for that patient |
 | GET | `/` | The SPA |
 
 Interactive API docs are auto-served at **http://localhost:8000/docs**.

@@ -79,10 +79,12 @@ body {
 }
 .topbar-left { display: flex; align-items: center; gap: 8px; }
 .topbar-mid { flex: 1; display: flex; justify-content: center; }
-#patient-select {
+.topbar-mid { gap: 8px; flex-wrap: wrap; }
+#patient-select, #record-select {
   background: var(--card); color: var(--text); border: 1px solid var(--line);
-  border-radius: 10px; padding: 8px 12px; font-size: 14px; max-width: 320px; width: 100%;
+  border-radius: 10px; padding: 8px 12px; font-size: 14px; max-width: 320px;
 }
+#record-select { border-color: var(--accent); max-width: 360px; }
 .pill {
   background: linear-gradient(135deg, var(--accent), var(--brain)); color: #08101f;
   border: 0; border-radius: 999px; padding: 9px 16px; font-weight: 700; cursor: pointer; font-size: 13px;
@@ -173,6 +175,33 @@ body {
 .img-note { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .img-note b { font-size: 13px; }
 .img-note p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+
+/* ---------- Patient Record ---------- */
+#pane-record { border-color: var(--accent); }
+.muted { color: var(--muted); font-weight: 400; }
+.rec-head { margin-bottom: 12px; }
+.rec-name { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+.rec-block { margin-top: 14px; }
+.rec-block h4 {
+  margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--muted);
+}
+.rec-list { margin: 0; padding-left: 18px; }
+.rec-list li { margin: 3px 0; font-size: 13px; }
+.region-row {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 8px 10px; background: var(--card); border: 1px solid var(--line);
+  border-left-width: 3px; border-radius: 8px; margin-bottom: 8px;
+}
+.region-row b { font-size: 13px; }
+.region-row p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+.region-dot { flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%; margin-top: 3px; }
+.region-row.sev-high { border-left-color: #ff5c7a; }
+.region-row.sev-high .region-dot { background: #ff5c7a; box-shadow: 0 0 8px #ff5c7a99; }
+.region-row.sev-moderate { border-left-color: #fbbf24; }
+.region-row.sev-moderate .region-dot { background: #fbbf24; box-shadow: 0 0 8px #fbbf2499; }
+.region-row.sev-low { border-left-color: #6ea8fe; }
+.region-row.sev-low .region-dot { background: #6ea8fe; box-shadow: 0 0 8px #6ea8fe99; }
 
 /* ---------- Portal Interactions ---------- */
 .portal-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

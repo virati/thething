@@ -166,7 +166,7 @@
     brain: [[-0.35, 0.5, 0.7], [0.45, 0.35, 0.6], [0.0, -0.2, 1.0], [-0.5, -0.1, 0.6]],
   };
 
-  function labelSprite(text) {
+  function labelSprite(text, accent) {
     const pad = 8, font = 22;
     const cv = document.createElement("canvas");
     const ctx = cv.getContext("2d");
@@ -176,6 +176,10 @@
     ctx.font = `600 ${font}px system-ui, sans-serif`;
     ctx.fillStyle = "rgba(12,18,32,0.86)";
     roundRect(ctx, 0, 0, cv.width, cv.height, 8); ctx.fill();
+    if (accent != null) {
+      ctx.strokeStyle = "#" + accent.toString(16).padStart(6, "0");
+      ctx.lineWidth = 2; roundRect(ctx, 1, 1, cv.width - 2, cv.height - 2, 8); ctx.stroke();
+    }
     ctx.fillStyle = "#e8eefc";
     ctx.textBaseline = "middle";
     ctx.fillText(text, pad, cv.height / 2 + 1);
@@ -214,8 +218,31 @@
     });
   }
 
+  // Regions of concern: dots at explicit 3D coords, colored by severity.
+  const SEV_COLOR = { high: 0xff5c7a, moderate: 0xfbbf24, low: 0x6ea8fe };
+  function addRegions(group, regions, fit) {
+    (regions || []).forEach((rg) => {
+      if (rg.x == null) return;
+      const color = SEV_COLOR[rg.severity] || SEV_COLOR.low;
+      const p = new T.Vector3(rg.x, rg.y, rg.z).multiplyScalar(fit);
+      const marker = new T.Mesh(
+        new T.SphereGeometry(0.055, 16, 16),
+        new T.MeshBasicMaterial({ color })
+      );
+      marker.position.copy(p);
+      const halo = new T.Mesh(
+        new T.SphereGeometry(0.13, 16, 16),
+        new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.25 })
+      );
+      halo.position.copy(p);
+      const label = labelSprite(rg.label, color);
+      label.position.copy(p).add(new T.Vector3(0.22, 0.16, 0));
+      group.add(marker, halo, label);
+    });
+  }
+
   // ---- Render ------------------------------------------------------------ //
-  function render(container, { focus, annotations }) {
+  function render(container, { focus, annotations, regions }) {
     dispose();
     const isBrain = focus === "brain";
     const width = container.clientWidth || 340;
@@ -249,6 +276,7 @@
       organ.meshes.forEach((m) => group.add(m));
       active.disposables.push(...organ.disposables);
       addMarkers(group, isBrain, annotations, organ.fit);
+      if (isBrain) addRegions(group, regions, organ.fit);
     };
 
     const controls = new T.OrbitControls(camera, renderer.domElement);

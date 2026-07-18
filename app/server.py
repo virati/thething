@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.advocate import package_context
+from app import records
 
 BASE = Path(__file__).resolve().parent
 DATA_DIR = BASE / "data"
@@ -44,6 +45,25 @@ def get_patient(pid: str) -> dict:
 @app.get("/api/patients/{pid}/package")
 def get_package(pid: str) -> dict:
     return package_context(_load(pid))
+
+
+# ---- Real patient records (data/patients/<folder>/) ---------------------- #
+@app.get("/api/records")
+def list_records() -> list[dict]:
+    return records.list_records()
+
+
+@app.get("/api/records/{folder}")
+def get_record(folder: str) -> dict:
+    try:
+        return records.parse_record(folder)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Unknown record {folder}")
+
+
+@app.get("/api/records/{folder}/regions")
+def get_regions(folder: str) -> list[dict]:
+    return records.load_regions(folder)
 
 
 @app.get("/")
