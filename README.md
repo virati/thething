@@ -22,9 +22,11 @@ app/
   data/            Generated synthetic patient stories (JSON)
   static/          SPA (index.html, app.js, styles.css)
     anatomy3d.js   3D heart/brain renderer (marker overlays, orbit controls)
-    vendor/        Three.js r128 + OrbitControls, vendored so the app is offline
+    assets/        Baked mesh assets (brain.glb, optional — see below)
+    vendor/        Three.js r128 + OrbitControls + GLTFLoader, vendored (offline)
 scripts/
   generate_stories.py   Builds up to 20 synthetic stories
+  fetch_brain_mesh.py   Bakes a real BrainGlobe/brainrender brain mesh -> brain.glb
 main.py            Convenience launcher (uvicorn)
 ```
 
@@ -72,10 +74,17 @@ uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
    or **James Okafor** — neuro; these are the hand-authored "hero" stories).
 3. **Conversations pane** — expand a phone call or chat to see the transcript
    plus extracted **affect**, sentiment, engagement, and unmet needs.
-4. **Anatomy / Imaging pane** — an interactive **3D** heart or brain (drag to
-   rotate, auto-spins) with patient-specific marker overlays and imaging
-   findings. Use the **organ dropdown** (❤ Heart / 🧠 Brain) to switch models.
-5. Click **"Package context →"** to open the Advocate brief. Toggle between
+4. **Anatomy / Imaging pane** — an interactive **3D** organ (drag to rotate,
+   auto-spins) with patient-specific marker overlays and imaging findings.
+   **Brain is the default**; use the **organ dropdown** (🧠 Brain / ❤ Heart) to
+   switch. The brain renders as a translucent **"glass brain"** with edge glow,
+   so the imaging markers appear suspended inside it.
+5. **Portal Interactions pane** (full width) — secure messages, refill requests,
+   released results, scheduling, forms, and billing the patient did through the
+   health-system portal, each with type, direction, and status (e.g. a diuretic
+   refill left *pending* over a copay). More between-visit context the clinic
+   rarely sees.
+6. Click **"Package context →"** to open the Advocate brief. Toggle between
    **Without middle zones** (what the clinic sees today) and **With middle
    zones** (engagement score, unmet needs, between-visit highlights, and
    "ask the right questions sooner" prompts). That contrast is the pitch.
@@ -90,6 +99,27 @@ uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
 | GET | `/` | The SPA |
 
 Interactive API docs are auto-served at **http://localhost:8000/docs**.
+
+## Real anatomical brain (BrainGlobe / brainrender) — optional
+
+By default the brain is a **procedural glass brain** (no download needed). To use
+a real, atlas-derived anatomical brain surface from
+[BrainGlobe / brainrender](https://github.com/brainglobe/brainrender), bake it
+into a web asset once:
+
+```bash
+uv run --with brainglobe-atlasapi --with trimesh python scripts/fetch_brain_mesh.py
+```
+
+This downloads a BrainGlobe atlas (human first, mouse as fallback), extracts the
+whole-brain "root" surface, normalizes/decimates it, and writes
+`app/static/assets/brain.glb`. The viewer loads it automatically and shades it
+with the same glass material; if the file is absent (or BrainGlobe's data server
+is unreachable), it silently falls back to the procedural brain. The dependencies
+are ephemeral (`--with`) and are **not** added to the app's runtime.
+
+> Note: BrainGlobe's data server (GIN) was unreachable at build time, so the
+> `.glb` isn't committed — re-run the script when the server is up.
 
 ## Regenerating / editing data
 

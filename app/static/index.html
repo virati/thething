@@ -54,32 +54,44 @@
       </div>
     </header>
 
-    <div class="panes">
-      <!-- Conversations pane -->
-      <section class="pane" id="pane-conversations">
-        <h2 class="pane-title">Conversations</h2>
-        <p class="pane-sub">Phone calls, chatbots — the middle zones between visits.</p>
-        <div id="conversations-list" class="conv-list"></div>
-      </section>
+    <div class="stage" id="stage">
+      <!-- Main screen: the glass brain (3D anatomy) -->
+      <div id="anatomy" class="anatomy"></div>
 
-      <!-- Anatomy / Imaging pane -->
-      <section class="pane" id="pane-anatomy">
-        <div class="pane-head">
-          <div>
-            <h2 class="pane-title">Anatomy / Imaging</h2>
-            <p class="pane-sub">3D template + patient-specific imaging overlays. Drag to rotate.</p>
-          </div>
-          <label class="organ-picker">
-            <span class="sr-only">Organ</span>
-            <select id="organ-select">
-              <option value="heart">❤ Heart</option>
-              <option value="brain">🧠 Brain</option>
-            </select>
-          </label>
-        </div>
-        <div id="anatomy" class="anatomy"></div>
-        <div id="imaging-notes" class="imaging-notes"></div>
-      </section>
+      <!-- Floating organ control -->
+      <div class="stage-controls">
+        <label class="organ-picker">
+          <span class="sr-only">Organ</span>
+          <select id="organ-select">
+            <option value="brain">🧠 Brain</option>
+            <option value="heart">❤ Heart</option>
+          </select>
+        </label>
+      </div>
+
+      <!-- Collapsible side panel toggle -->
+      <button id="side-toggle" class="side-toggle" aria-label="Collapse panel" aria-expanded="true">›</button>
+
+      <!-- Collapsible side panel: conversations, portal, imaging -->
+      <aside id="side-panel" class="side-panel">
+        <section class="pane" id="pane-conversations">
+          <h2 class="pane-title">Conversations</h2>
+          <p class="pane-sub">Phone calls, chatbots — the middle zones between visits.</p>
+          <div id="conversations-list" class="conv-list"></div>
+        </section>
+
+        <section class="pane" id="pane-portal">
+          <h2 class="pane-title">Portal Interactions</h2>
+          <p class="pane-sub">Secure messages, refills, released results, scheduling, forms &amp; billing — the patient's touches with the health-system portal.</p>
+          <div id="portal-list" class="portal-list"></div>
+        </section>
+
+        <section class="pane" id="pane-imaging">
+          <h2 class="pane-title">Imaging / Findings</h2>
+          <p class="pane-sub">Studies behind the anatomy view.</p>
+          <div id="imaging-notes" class="imaging-notes"></div>
+        </section>
+      </aside>
     </div>
   </main>
 
@@ -101,6 +113,7 @@
 
   <script src="/static/vendor/three.min.js"></script>
   <script src="/static/vendor/OrbitControls.js"></script>
+  <script src="/static/vendor/GLTFLoader.js"></script>
   <script src="/static/anatomy3d.js"></script>
   <script src="/static/app.js"></script>
 </body>

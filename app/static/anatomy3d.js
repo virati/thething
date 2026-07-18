@@ -69,6 +69,97 @@
     return geo;
   }
 
+  // Fresnel "glass" material — bright at grazing edges, transparent face.
+  // This is the glass-brain signature (edge-lit translucent shell).
+  function fresnelMaterial(color, power, opacity) {
+    return new T.ShaderMaterial({
+      uniforms: {
+        glowColor: { value: new T.Color(color) },
+        power: { value: power },
+        opacity: { value: opacity },
+      },
+      vertexShader: `
+        varying vec3 vN; varying vec3 vV;
+        void main() {
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vN = normalize(normalMatrix * normal);
+          vV = normalize(-mv.xyz);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        varying vec3 vN; varying vec3 vV;
+        uniform vec3 glowColor; uniform float power; uniform float opacity;
+        void main() {
+          float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), power);
+          gl_FragColor = vec4(glowColor, clamp(f, 0.0, 1.0) * opacity);
+        }`,
+      transparent: true,
+      blending: T.AdditiveBlending,
+      side: T.DoubleSide,
+      depthWrite: false,
+    });
+  }
+
+  // ---- Real anatomical brain from BrainGlobe / brainrender --------------- //
+  // Loads app/static/assets/brain.glb (baked by scripts/fetch_brain_mesh.py).
+  // Cached across renders; falls back to the procedural glass brain if the
+  // asset is missing or BrainGlobe's server was unreachable when baking.
+  let brainGeoCache = null;
+  function acquireBrainGeometry(done) {
+    if (brainGeoCache) return done(brainGeoCache, false);
+    if (!T.GLTFLoader) return done(brainGeometry(), true);
+    new T.GLTFLoader().load(
+      "/static/assets/brain.glb",
+      (gltf) => {
+        let g = null;
+        gltf.scene.traverse((o) => {
+          if (o.isMesh && !g) {
+            o.updateWorldMatrix(true, false);
+            g = o.geometry.clone();
+            g.applyMatrix4(o.matrixWorld);
+          }
+        });
+        if (!g) return done(brainGeometry(), true);
+        g.center();
+        g.computeVertexNormals();
+        brainGeoCache = g;
+        done(g, false);
+      },
+      undefined,
+      () => done(brainGeometry(), true) // 404 / network / parse -> procedural
+    );
+  }
+
+  // Builds an organ from a geometry: meshes (scaled to fit) + disposables.
+  function organFromGeometry(isBrain, geo, fitTarget, ownGeo) {
+    geo.computeBoundingSphere();
+    const fit = fitTarget / geo.boundingSphere.radius;
+    const meshes = [];
+    const disposables = ownGeo ? [geo] : []; // don't dispose the cached brain geo
+
+    if (isBrain) {
+      // translucent inner shell + fresnel edge glow = "glass brain"
+      const shellMat = new T.MeshPhysicalMaterial({
+        color: 0x9ecbff, transparent: true, opacity: 0.12,
+        roughness: 0.12, metalness: 0.0, side: T.DoubleSide,
+        depthWrite: false, clearcoat: 1.0, clearcoatRoughness: 0.25,
+      });
+      const shell = new T.Mesh(geo, shellMat); shell.renderOrder = 0;
+      const glowMat = fresnelMaterial(0x8fd0ff, 2.4, 0.95);
+      const glow = new T.Mesh(geo, glowMat); glow.renderOrder = 1;
+      meshes.push(shell, glow);
+      disposables.push(shellMat, glowMat);
+    } else {
+      const mat = new T.MeshStandardMaterial({
+        color: 0xd83a52, roughness: 0.42, metalness: 0.0, emissive: 0x2a0710,
+      });
+      meshes.push(new T.Mesh(geo, mat));
+      disposables.push(mat);
+    }
+    meshes.forEach((m) => m.scale.setScalar(fit));
+    return { meshes, disposables, fit };
+  }
+
   // 3D anchor points for annotation markers, per organ (model space). ----- //
   const ANCHORS = {
     heart: [[-0.55, 0.2, 0.7], [0.6, 0.15, 0.5], [0.05, -0.75, 0.5], [0.35, 0.7, 0.4]],
@@ -102,43 +193,8 @@
     ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
 
-  // ---- Render ------------------------------------------------------------ //
-  function render(container, { focus, annotations }) {
-    dispose();
-    const isBrain = focus === "brain";
-    const width = container.clientWidth || 340;
-    const height = Math.min(width, 380);
-
-    const scene = new T.Scene();
-    const camera = new T.PerspectiveCamera(42, width / height, 0.1, 100);
-    camera.position.set(0, 0.2, 4.2);
-
-    const renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(width, height);
-    container.innerHTML = "";
-    container.appendChild(renderer.domElement);
-
-    scene.add(new T.AmbientLight(0xffffff, 0.5));
-    const key = new T.DirectionalLight(0xffffff, 0.95); key.position.set(3, 4, 5); scene.add(key);
-    const rim = new T.DirectionalLight(isBrain ? 0xb98cff : 0x6ea8fe, 0.6); rim.position.set(-4, 1, -3); scene.add(rim);
-
-    const geo = isBrain ? brainGeometry() : heartGeometry();
-    const mat = new T.MeshStandardMaterial({
-      color: isBrain ? 0xe7b7c8 : 0xd83a52,
-      roughness: isBrain ? 0.85 : 0.42,
-      metalness: 0.0,
-      emissive: isBrain ? 0x1a0f18 : 0x2a0710,
-    });
-    const mesh = new T.Mesh(geo, mat);
-    geo.computeBoundingSphere();
-    const fit = 1.35 / geo.boundingSphere.radius;
-    mesh.scale.setScalar(fit);
-
-    const group = new T.Group();
-    group.add(mesh);
-
-    // annotation markers + labels
+  // Glowing marker + label for each imaging annotation, placed at organ anchors.
+  function addMarkers(group, isBrain, annotations, fit) {
     const anchors = ANCHORS[isBrain ? "brain" : "heart"];
     (annotations || []).slice(0, anchors.length).forEach((ann, i) => {
       const p = new T.Vector3(...anchors[i]).multiplyScalar(fit);
@@ -156,7 +212,44 @@
       label.position.copy(p).add(new T.Vector3(0.2, 0.16, 0));
       group.add(marker, halo, label);
     });
+  }
+
+  // ---- Render ------------------------------------------------------------ //
+  function render(container, { focus, annotations }) {
+    dispose();
+    const isBrain = focus === "brain";
+    const width = container.clientWidth || 340;
+    const height = container.clientHeight || Math.min(width, 480);
+
+    const scene = new T.Scene();
+    const camera = new T.PerspectiveCamera(42, width / height, 0.1, 100);
+    camera.position.set(0, 0.2, 4.2);
+
+    const renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(width, height);
+    container.innerHTML = "";
+    container.appendChild(renderer.domElement);
+
+    scene.add(new T.AmbientLight(0xffffff, isBrain ? 0.6 : 0.5));
+    const key = new T.DirectionalLight(0xffffff, 0.95); key.position.set(3, 4, 5); scene.add(key);
+    const rim = new T.DirectionalLight(isBrain ? 0x66ccff : 0x6ea8fe, isBrain ? 0.8 : 0.6);
+    rim.position.set(-4, 1, -3); scene.add(rim);
+
+    const group = new T.Group();
     scene.add(group);
+
+    // Assemble the organ (brain geometry may arrive asynchronously).
+    const assemble = (geo, ownGeo) => {
+      if (!active || active.group !== group) {
+        if (ownGeo) geo.dispose(); // a newer render superseded this one
+        return;
+      }
+      const organ = organFromGeometry(isBrain, geo, 1.35, ownGeo);
+      organ.meshes.forEach((m) => group.add(m));
+      active.disposables.push(...organ.disposables);
+      addMarkers(group, isBrain, annotations, organ.fit);
+    };
 
     const controls = new T.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -178,13 +271,18 @@
 
     function resize() {
       const w = container.clientWidth || width;
-      const h = Math.min(w, 380);
+      const h = container.clientHeight || Math.min(w, 480);
       camera.aspect = w / h; camera.updateProjectionMatrix();
       renderer.setSize(w, h);
     }
     window.addEventListener("resize", resize);
 
-    active = { renderer, controls, raf, resize, scene, geo, mat };
+    active = { renderer, controls, raf, resize, scene, disposables: [], group };
+
+    // Kick off organ assembly now that `active` exists. Brain geometry is
+    // fetched asynchronously (real BrainGlobe mesh, else procedural fallback).
+    if (isBrain) acquireBrainGeometry(assemble);
+    else assemble(heartGeometry(), true);
   }
 
   function dispose() {
@@ -192,8 +290,7 @@
     cancelAnimationFrame(active.raf);
     window.removeEventListener("resize", active.resize);
     active.controls.dispose();
-    active.geo.dispose();
-    active.mat.dispose();
+    (active.disposables || []).forEach((d) => d.dispose && d.dispose());
     active.renderer.forceContextLoss?.();
     active.renderer.dispose();
     active = null;

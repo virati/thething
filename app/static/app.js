@@ -39,12 +39,25 @@ async function selectPatient(id) {
   const res = await fetch(`/api/patients/${id}`);
   state.patient = await res.json();
   state.package = null;
-  $("#organ-select").value = state.patient.focus || "heart";
+  // Brain is the default organ; keep whatever the user has selected across patients.
   renderConversations();
+  renderPortal();
   renderAnatomy();
 }
 
 $("#organ-select").addEventListener("change", renderAnatomy);
+
+// Collapsible side panel
+const sideToggle = $("#side-toggle");
+sideToggle.addEventListener("click", () => {
+  const collapsed = $("#stage").classList.toggle("collapsed");
+  sideToggle.textContent = collapsed ? "‹" : "›";
+  sideToggle.setAttribute("aria-expanded", String(!collapsed));
+  sideToggle.setAttribute("aria-label", collapsed ? "Expand panel" : "Collapse panel");
+  // the stage width animates (.28s) — resize the 3D canvas as it settles
+  window.dispatchEvent(new Event("resize"));
+  setTimeout(() => window.dispatchEvent(new Event("resize")), 320);
+});
 
 // --------------------------------------------------------------------------- //
 // Conversations pane                                                          //
@@ -95,6 +108,52 @@ function renderConversations() {
     })
     .join("");
   if (!convs.length) list.innerHTML = `<p class="empty">No conversations.</p>`;
+}
+
+// --------------------------------------------------------------------------- //
+// Portal Interactions pane                                                    //
+// --------------------------------------------------------------------------- //
+const PORTAL_ICON = {
+  message: "✉️", refill: "💊", result: "🧪",
+  appointment: "📅", form: "📝", billing: "💳",
+};
+const PORTAL_STATUS = {
+  pending: "warn", "awaiting-response": "warn",
+  responded: "pos", completed: "pos", scheduled: "pos",
+  viewed: "muted",
+};
+
+function renderPortal() {
+  const list = $("#portal-list");
+  const items = (state.patient.portal_interactions || [])
+    .slice()
+    .sort((a, b) => (a.date < b.date ? 1 : -1)); // newest first
+  if (!items.length) {
+    list.innerHTML = `<p class="empty">No portal interactions.</p>`;
+    return;
+  }
+  list.innerHTML = items
+    .map((it) => {
+      const cls = PORTAL_STATUS[it.status] || "muted";
+      const dir = it.direction === "outbound" ? "Patient → system" : "System → patient";
+      return `
+        <div class="portal-item">
+          <span class="portal-icon">${PORTAL_ICON[it.type] || "🔔"}</span>
+          <div class="portal-main">
+            <div class="portal-top">
+              <span class="portal-title">${escapeHtml(it.title)}</span>
+              <span class="chip ${cls}">${escapeHtml(it.status)}</span>
+            </div>
+            <p class="portal-detail">${escapeHtml(it.detail || "")}</p>
+            <div class="portal-meta">
+              <span class="portal-type">${escapeHtml(it.type)}</span>
+              <span>${escapeHtml(dir)}</span>
+              <span>${escapeHtml(it.date)}</span>
+            </div>
+          </div>
+        </div>`;
+    })
+    .join("");
 }
 
 // --------------------------------------------------------------------------- //

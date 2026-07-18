@@ -99,6 +99,28 @@ HERO_STORIES = [
                 ],
             }
         ],
+        "portal_interactions": [
+            {"type": "message", "date": "2026-06-15", "direction": "outbound",
+             "title": "Message to care team: swelling & shortness of breath",
+             "detail": "Reports increased ankle swelling and needing 3 pillows to sleep.",
+             "status": "responded"},
+            {"type": "refill", "date": "2026-06-10", "direction": "outbound",
+             "title": "Refill request: torsemide (diuretic)",
+             "detail": "Refill never picked up — patient flagged the $40 copay as a barrier.",
+             "status": "pending"},
+            {"type": "result", "date": "2026-06-03", "direction": "inbound",
+             "title": "Lab result released: BNP 1,240 pg/mL",
+             "detail": "Result viewed by patient; no follow-up message sent.",
+             "status": "viewed"},
+            {"type": "appointment", "date": "2026-06-05", "direction": "inbound",
+             "title": "Cardiology follow-up scheduled",
+             "detail": "Booked 2 weeks out; patient opened the reschedule link twice.",
+             "status": "scheduled"},
+            {"type": "billing", "date": "2026-06-12", "direction": "inbound",
+             "title": "Outstanding balance reminder ($312)",
+             "detail": "Financial-assistance application started but not submitted.",
+             "status": "pending"},
+        ],
         "timeline": [
             {"date": "2026-05-28", "kind": "visit", "event": "ED visit for dyspnea; admitted"},
             {"date": "2026-05-30", "kind": "imaging", "event": "Echo: EF 32%"},
@@ -180,6 +202,28 @@ HERO_STORIES = [
                     {"label": "Hippocampus — asymmetry", "x": 44, "y": 66},
                 ],
             }
+        ],
+        "portal_interactions": [
+            {"type": "message", "date": "2026-07-02", "direction": "outbound",
+             "title": "Message to neurology: is it safe to drive?",
+             "detail": "Asks whether he should keep driving to work after the episodes.",
+             "status": "awaiting-response"},
+            {"type": "appointment", "date": "2026-06-30", "direction": "outbound",
+             "title": "Appointment request: neurology consult",
+             "detail": "Requested earliest available; portal shows a 6-week wait.",
+             "status": "pending"},
+            {"type": "result", "date": "2026-06-29", "direction": "inbound",
+             "title": "Imaging result released: Brain MRI report",
+             "detail": "Viewed report, then searched 'mesial temporal sclerosis'.",
+             "status": "viewed"},
+            {"type": "form", "date": "2026-07-06", "direction": "outbound",
+             "title": "Seizure diary submitted",
+             "detail": "Logged 3 focal episodes with auras over 10 days.",
+             "status": "completed"},
+            {"type": "message", "date": "2026-07-08", "direction": "outbound",
+             "title": "Message: new word-finding difficulty",
+             "detail": "Reports trouble finding words between episodes.",
+             "status": "awaiting-response"},
         ],
         "timeline": [
             {"date": "2026-06-24", "kind": "visit", "event": "PCP visit after first episode"},
@@ -264,6 +308,29 @@ def make_filler(idx: int, rng: random.Random) -> dict:
             },
         }
 
+    def portal(spec: tuple) -> dict:
+        kind, direction, title, detail, status = spec
+        return {
+            "type": kind, "direction": direction,
+            "date": _rand_date(rng, base, 45),
+            "title": title, "detail": detail, "status": status,
+        }
+
+    portal_pool = [
+        ("message", "outbound", f"Message to care team about {cond.lower()}",
+         "Patient asked about a symptom change between visits.", "responded"),
+        ("refill", "outbound", "Prescription refill request",
+         "Refill requested through the portal.", rng.choice(["pending", "completed"])),
+        ("result", "inbound", f"{modality} result released",
+         "Result viewed by patient; no message sent.", "viewed"),
+        ("appointment", "inbound", f"{next_visit} scheduled",
+         "Appointment booked; reminder sent.", "scheduled"),
+        ("form", "outbound", "Intake / symptom questionnaire submitted",
+         "Patient completed a pre-visit form.", "completed"),
+        ("billing", "inbound", "Balance reminder",
+         "Outstanding balance notice sent to portal.", rng.choice(["pending", "viewed"])),
+    ]
+
     return {
         "id": pid,
         "name": name,
@@ -278,6 +345,7 @@ def make_filler(idx: int, rng: random.Random) -> dict:
             conv("phone", "Care team call", 1),
             conv("chat", rng.choice(["Claude", "ChatGPT"]), 2),
         ],
+        "portal_interactions": [portal(s) for s in rng.sample(portal_pool, 4)],
         "imaging": [
             {
                 "modality": modality,
