@@ -1,61 +1,66 @@
-"""Fetch a real anatomical brain surface from BrainGlobe / brainrender atlases
-and bake it into a compact web asset (app/static/assets/brain.glb).
+"""Bake a *proper* anatomical brain surface into a web asset (brain.glb).
 
-BrainGlobe (https://github.com/brainglobe/brainrender) is the mesh layer behind
-brainrender; `brainglobe-atlasapi` downloads atlas data including per-structure
-`.obj` meshes. We export the whole-brain "root" surface, normalize it, and write
-a GLB the Three.js viewer loads and shades as a glass brain.
+Primary source is FreeSurfer's **fsaverage** cortical surface — the same mesh
+PySurfer renders in its "transparent brain" example
+(https://pysurfer.github.io/auto_examples/plot_transparent_brain.html).
+We fetch it via nilearn (no FreeSurfer / Mayavi install needed), stitch the two
+hemispheres, orient it upright, normalize/decimate, and export a GLB that the
+Three.js viewer loads and shades as a glass brain.
 
 Run (deps are ephemeral, not added to the app runtime):
-  uv run --with brainglobe-atlasapi --with trimesh python scripts/fetch_brain_mesh.py
+  uv run --with nilearn --with nibabel --with trimesh python scripts/fetch_brain_mesh.py
 
-If BrainGlobe's data server is unreachable, the app falls back to a procedural
-glass brain automatically — this script only needs to succeed once.
+If the surface can't be fetched, the app falls back to a procedural glass brain.
 """
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import numpy as np
 import trimesh
-from brainglobe_atlasapi import BrainGlobeAtlas
 
 OUT = Path(__file__).resolve().parents[1] / "app" / "static" / "assets" / "brain.glb"
+MAX_FACES = 60_000  # decimate above this to keep the asset light
 
-# Preference order: a human brain reads best for a patient app; mouse atlases
-# are smaller fallbacks if the human atlas is unavailable.
-ATLAS_CANDIDATES = [
-    "allen_human_500um",
-    "allen_mouse_50um",
-    "allen_mouse_100um",
-    "example_mouse_100um",
-]
-MAX_FACES = 40_000  # decimate above this to keep the web asset light
+# fsaverage meshes, in decreasing detail. fsaverage6 ~ 80k verts/hemi (nice
+# folds); fsaverage5 ~ 10k (lighter). Full "fsaverage" is ~160k/hemi.
+FSAVERAGE_VARIANTS = ["fsaverage6", "fsaverage5"]
+SURFACE = "pial"  # folded cortical surface = "proper" brain (vs. "infl")
 
 
-def load_root_mesh() -> trimesh.Trimesh:
+def fetch_fsaverage_mesh() -> trimesh.Trimesh:
+    from nilearn import datasets, surface
+
     last_err = None
-    for name in ATLAS_CANDIDATES:
+    for variant in FSAVERAGE_VARIANTS:
         try:
-            print(f"→ trying atlas {name} …", flush=True)
-            atlas = BrainGlobeAtlas(name)
-            mf = atlas.meshfile_from_structure("root")
-            mesh = trimesh.load(str(mf), process=True)
-            print(f"  got root mesh: {len(mesh.faces)} faces, {len(mesh.vertices)} verts")
+            print(f"→ fetching {variant} ({SURFACE}) …", flush=True)
+            fs = datasets.fetch_surf_fsaverage(variant)
+            cl, fl = surface.load_surf_mesh(fs[f"{SURFACE}_left"])
+            cr, fr = surface.load_surf_mesh(fs[f"{SURFACE}_right"])
+            # stitch hemispheres (offset right-hemi face indices)
+            verts = np.vstack([cl, cr])
+            faces = np.vstack([fl, fr + len(cl)])
+            mesh = trimesh.Trimesh(vertices=verts, faces=faces, process=True)
+            print(f"  loaded: {len(mesh.faces)} faces, {len(mesh.vertices)} verts")
             return mesh
-        except Exception as e:  # noqa: BLE001 — try the next atlas
+        except Exception as e:  # noqa: BLE001 — try a lighter variant
             print(f"  failed: {e}")
             last_err = e
-    raise SystemExit(f"Could not fetch any atlas mesh (server down?). Last error: {last_err}")
+    raise SystemExit(f"Could not fetch fsaverage surface. Last error: {last_err}")
+
+
+def orient_upright(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
+    # FreeSurfer RAS: x=R, y=A, z=S(up). Three.js is y-up, so rotate z->y.
+    R = trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0])
+    mesh.apply_transform(R)
+    return mesh
 
 
 def normalize(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
-    # center on the origin and scale so the largest dimension ~= 2 units
     mesh.apply_translation(-mesh.bounds.mean(axis=0))
-    scale = 2.0 / mesh.extents.max()
-    mesh.apply_scale(scale)
+    mesh.apply_scale(2.0 / mesh.extents.max())
     return mesh
 
 
@@ -63,7 +68,15 @@ def decimate(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
     if len(mesh.faces) <= MAX_FACES:
         return mesh
     try:
-        m = mesh.simplify_quadric_decimation(MAX_FACES)
+        import fast_simplification
+
+        reduction = max(0.0, min(0.95, 1 - MAX_FACES / len(mesh.faces)))
+        v, f = fast_simplification.simplify(
+            np.asarray(mesh.vertices, dtype=np.float32),
+            np.asarray(mesh.faces, dtype=np.int32),
+            reduction,
+        )
+        m = trimesh.Trimesh(vertices=v, faces=f, process=True)
         print(f"  decimated to {len(m.faces)} faces")
         return m
     except Exception as e:  # noqa: BLE001 — optional; keep full mesh if unavailable
@@ -72,15 +85,15 @@ def decimate(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
 
 
 def main() -> None:
-    mesh = load_root_mesh()
+    mesh = fetch_fsaverage_mesh()
+    mesh = orient_upright(mesh)
     mesh = decimate(mesh)
     mesh = normalize(mesh)
-    # smooth vertex normals for a nice glass look
     mesh.fix_normals()
     OUT.parent.mkdir(parents=True, exist_ok=True)
     mesh.export(str(OUT))
-    print(f"✓ wrote {OUT} ({OUT.stat().st_size // 1024} KB)")
+    print(f"✓ wrote {OUT} ({OUT.stat().st_size // 1024} KB, {len(mesh.faces)} faces)")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
