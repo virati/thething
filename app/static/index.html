@@ -46,19 +46,22 @@
         <strong>HORIZON</strong>
       </div>
       <div class="topbar-mid">
-        <label for="record-select" class="sr-only">Patient record</label>
-        <select id="record-select" title="Real patient records (data/patients)"></select>
-        <label for="patient-select" class="sr-only">Synthetic story</label>
-        <select id="patient-select" title="Synthetic demo stories"></select>
-      </div>
-      <div class="topbar-right">
-        <button id="package-btn" class="pill">Package context →</button>
+        <span id="active-patient" class="active-patient">No patient selected</span>
+        <button id="download-btn" class="pill" title="Pull this patient's HORIZON context from their phone">⤓ Download HORIZON</button>
       </div>
     </header>
 
     <div class="stage" id="stage">
       <!-- Main screen: the glass brain (3D anatomy) -->
       <div id="anatomy" class="anatomy"></div>
+
+      <!-- Collapsible LEFT pop-out: patient chooser as a care-journey timeline -->
+      <button id="left-toggle" class="left-toggle" aria-label="Patients" aria-expanded="true">‹</button>
+      <aside id="left-panel" class="left-panel">
+        <h2 class="left-title">Patients</h2>
+        <p class="left-sub">Pick a care journey. Each marker is a clinical encounter; download HORIZON to restore the middle-zone context between them.</p>
+        <div id="patient-timeline" class="patient-timeline"></div>
+      </aside>
 
       <!-- Floating organ control -->
       <div class="stage-controls">
@@ -77,31 +80,44 @@
       <!-- Collapsible side panel toggle -->
       <button id="side-toggle" class="side-toggle" aria-label="Collapse panel" aria-expanded="true">›</button>
 
-      <!-- Collapsible side panel: record, conversations, portal, imaging -->
+      <!-- Collapsible side panel: record, conversations, portal, imaging.
+           Each pane is a native <details> accordion (collapsible). -->
       <aside id="side-panel" class="side-panel">
-        <section class="pane hidden" id="pane-record">
-          <h2 class="pane-title">Patient Record</h2>
+        <details class="pane hidden" id="pane-record" open>
+          <summary class="pane-summary">
+            <span class="pane-chev">▶</span>
+            <h2 class="pane-title">Patient Record</h2>
+          </summary>
           <p class="pane-sub">All information from <code>data/patients</code> — demographics, longitudinal summary, and every encounter's note, transcript &amp; after-visit summary.</p>
           <div id="record-body"></div>
-        </section>
+        </details>
 
-        <section class="pane" id="pane-conversations">
-          <h2 class="pane-title">Conversations</h2>
+        <details class="pane" id="pane-conversations" open>
+          <summary class="pane-summary">
+            <span class="pane-chev">▶</span>
+            <h2 class="pane-title">Conversations</h2>
+          </summary>
           <p class="pane-sub">Phone calls, chatbots — the middle zones between visits.</p>
           <div id="conversations-list" class="conv-list"></div>
-        </section>
+        </details>
 
-        <section class="pane" id="pane-portal">
-          <h2 class="pane-title">Portal Interactions</h2>
+        <details class="pane" id="pane-portal" open>
+          <summary class="pane-summary">
+            <span class="pane-chev">▶</span>
+            <h2 class="pane-title">Portal Interactions</h2>
+          </summary>
           <p class="pane-sub">Secure messages, refills, released results, scheduling, forms &amp; billing — the patient's touches with the health-system portal.</p>
           <div id="portal-list" class="portal-list"></div>
-        </section>
+        </details>
 
-        <section class="pane" id="pane-imaging">
-          <h2 class="pane-title">Imaging / Findings</h2>
+        <details class="pane" id="pane-imaging" open>
+          <summary class="pane-summary">
+            <span class="pane-chev">▶</span>
+            <h2 class="pane-title">Imaging / Findings</h2>
+          </summary>
           <p class="pane-sub">Studies behind the anatomy view.</p>
           <div id="imaging-notes" class="imaging-notes"></div>
-        </section>
+        </details>
       </aside>
     </div>
   </main>
@@ -127,8 +143,7 @@
     <div class="hz-card">
       <div class="hz-brand">◇ HORIZON</div>
       <h2 id="hz-title">Patient</h2>
-      <p class="hz-sub">Cross-system patient context is available for this patient.</p>
-      <button id="hz-download" class="hz-btn">⤓ Download HORIZON context</button>
+      <p class="hz-sub">Pulling cross-system context from the patient's phone…</p>
       <div id="hz-progress" class="hz-progress hidden">
         <div class="hz-bar"><i id="hz-bar-fill"></i></div>
         <div id="hz-status" class="hz-status">Connecting…</div>

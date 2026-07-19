@@ -2,7 +2,7 @@
 
 const $ = (sel) => document.querySelector(sel);
 
-const state = { patient: null, package: null, view: "without", record: null, regions: [] };
+const state = { patient: null, package: null, view: "without", record: null, regions: [], selectedFolder: null };
 
 // --------------------------------------------------------------------------- //
 // Auth (mock)                                                                 //
@@ -10,76 +10,96 @@ const state = { patient: null, package: null, view: "without", record: null, reg
 $("#signin").addEventListener("click", async () => {
   $("#auth").classList.add("hidden");
   $("#app").classList.remove("hidden");
-  await loadPatients();
+  renderConversations(); // empty until a patient's context is downloaded
+  renderPortal();
+  renderAnatomy(); // glass brain
   await loadRecords();
 });
 
 // --------------------------------------------------------------------------- //
-// Data loading                                                                //
+// Patients — left pop-out chooser rendered as a care-journey timeline          //
 // --------------------------------------------------------------------------- //
-async function loadPatients() {
-  const res = await fetch("/api/patients");
-  if (!res.ok) {
-    $("#conversations-list").innerHTML =
-      `<p class="empty">No data. Run: uv run python scripts/generate_stories.py</p>`;
-    return;
-  }
-  const patients = await res.json();
-  const sel = $("#patient-select");
-  sel.innerHTML = patients
-    .map(
-      (p) =>
-        `<option value="${p.id}">${p.name} · ${p.age}${p.sex} · ${p.primary_condition}</option>`
-    )
-    .join("");
-  sel.addEventListener("change", () => selectPatient(sel.value));
-  await selectPatient(patients[0].id);
-}
+const CAT_COLOR = {
+  routine: "#6ea8fe", acute: "#ff5c7a",
+  hospitalization: "#fbbf24", procedure: "#a78bfa",
+};
 
-async function selectPatient(id) {
-  const res = await fetch(`/api/patients/${id}`);
-  state.patient = await res.json();
-  state.package = null;
-  // Brain is the default organ; keep whatever the user has selected across patients.
-  renderConversations();
-  renderPortal();
-  renderAnatomy();
-}
-
-// --------------------------------------------------------------------------- //
-// Real patient records (data/patients)                                        //
-// --------------------------------------------------------------------------- //
 async function loadRecords() {
-  const sel = $("#record-select");
   let records = [];
   try {
     records = await (await fetch("/api/records")).json();
   } catch (_) { /* no records */ }
-  const opts = ['<option value="">— Patient record —</option>'];
-  records.forEach((r) => {
-    const who = `${r.name}${r.age != null ? ` · ${r.age}${(r.gender || "")[0] || ""}` : ""}`;
-    opts.push(`<option value="${r.folder}">📁 ${who} · ${r.headline || ""}</option>`);
-  });
-  sel.innerHTML = opts.join("");
-  sel.addEventListener("change", () => selectRecord(sel.value));
-}
-
-async function selectRecord(folder) {
-  if (!folder) {
-    state.record = null;
-    state.regions = [];
-    $("#pane-record").classList.add("hidden");
-    renderAnatomy();
+  const host = $("#patient-timeline");
+  if (!records.length) {
+    host.innerHTML = `<p class="empty">No patients found.</p>`;
     return;
   }
+  host.innerHTML = records.map(renderPatientRow).join("");
+  host.querySelectorAll(".pt-row").forEach((row) =>
+    row.addEventListener("click", () => selectPatient(row.dataset.folder))
+  );
+  // Auto-select the first patient so HORIZON has a target.
+  selectPatient(records[0].folder);
+}
+
+function renderPatientRow(r) {
+  const who = r.age != null ? `${r.age}${(r.gender || "")[0]?.toUpperCase() || ""}` : "";
+  const tl = (r.timeline || []).filter((e) => e.date);
+  const times = tl.map((e) => new Date(e.date).getTime()).filter((t) => !isNaN(t));
+  const min = Math.min(...times), max = Math.max(...times), span = max - min || 1;
+  const markers = tl
+    .map((e) => {
+      const t = new Date(e.date).getTime();
+      const left = isNaN(t) ? 0 : ((t - min) / span) * 100;
+      const color = CAT_COLOR[e.type] || CAT_COLOR.routine;
+      return `<span class="pt-marker" style="left:${left}%;background:${color}" title="${escapeHtml(e.date)} · ${escapeHtml(e.title)}"></span>`;
+    })
+    .join("");
+  const fmt = (t) => (isNaN(t) ? "" : new Date(t).toISOString().slice(0, 7));
+  return `
+    <button class="pt-row" data-folder="${escapeHtml(r.folder)}">
+      <div class="pt-head">
+        <span class="pt-name">${escapeHtml(r.name)}</span>
+        <span class="pt-meta">${escapeHtml(who)}</span>
+      </div>
+      <div class="pt-headline">${escapeHtml(r.headline || "")}</div>
+      <div class="pt-track"><div class="pt-line"></div>${markers}</div>
+      ${times.length ? `<div class="pt-axis"><span>${fmt(min)}</span><span>${fmt(max)}</span></div>` : ""}
+      <div class="pt-count">${r.encounters || tl.length} encounters · download to restore the middle zone</div>
+    </button>`;
+}
+
+function selectPatient(folder) {
+  if (!folder) return;
+  state.selectedFolder = folder;
+  document.querySelectorAll(".pt-row").forEach((row) =>
+    row.classList.toggle("active", row.dataset.folder === folder)
+  );
+  const row = document.querySelector(`.pt-row[data-folder="${folder}"] .pt-name`);
+  $("#active-patient").textContent = row ? row.textContent : folder;
+  // Switching patient hides any revealed record until HORIZON is re-downloaded.
+  state.record = null;
+  state.regions = [];
+  $("#pane-record").classList.add("hidden");
+  renderAnatomy();
+}
+
+// --------------------------------------------------------------------------- //
+// Download HORIZON context (from the patient's phone) for the selected patient //
+// --------------------------------------------------------------------------- //
+$("#download-btn").addEventListener("click", downloadHorizon);
+
+async function downloadHorizon() {
+  const folder = state.selectedFolder;
+  if (!folder) return;
   const [rec, regions] = await Promise.all([
     fetch(`/api/records/${folder}`).then((r) => r.json()),
     fetch(`/api/records/${folder}/regions`).then((r) => r.json()),
   ]);
-  state.record = rec;
-  state.regions = regions || [];
-  // Gate the render behind a simulated "HORIZON context" download.
+  // Gate the render behind the simulated "HORIZON context" download.
   openHorizon(rec, () => {
+    state.record = rec;
+    state.regions = regions || [];
     renderRecord();
     $("#pane-record").classList.remove("hidden");
     $("#organ-select").value = "brain"; // regions live on the brain
@@ -92,21 +112,18 @@ async function selectRecord(folder) {
 // HORIZON context download (popup + ~5s status bar)                           //
 // --------------------------------------------------------------------------- //
 function openHorizon(rec, onReady) {
+  // Triggered by the top-bar "Download HORIZON" button, so start pulling
+  // immediately — the modal is the progress UI for the phone download.
   const modal = $("#horizon-modal");
-  const btn = $("#hz-download");
   $("#hz-title").textContent = rec.name;
-  $("#hz-progress").classList.add("hidden");
+  $("#hz-download")?.classList.add("hidden");
+  $("#hz-progress").classList.remove("hidden");
   $("#hz-bar-fill").style.width = "0%";
-  btn.classList.remove("hidden");
   modal.classList.remove("hidden");
-  btn.onclick = () => {
-    btn.classList.add("hidden");
-    $("#hz-progress").classList.remove("hidden");
-    runHorizonProgress(() => {
-      modal.classList.add("hidden");
-      onReady();
-    });
-  };
+  runHorizonProgress(() => {
+    modal.classList.add("hidden");
+    onReady();
+  });
 }
 
 function runHorizonProgress(done) {
@@ -217,6 +234,16 @@ sideToggle.addEventListener("click", () => {
   setTimeout(() => window.dispatchEvent(new Event("resize")), 320);
 });
 
+// Collapsible left pop-out (patient chooser)
+const leftToggle = $("#left-toggle");
+leftToggle.addEventListener("click", () => {
+  const collapsed = $("#stage").classList.toggle("left-collapsed");
+  leftToggle.textContent = collapsed ? "›" : "‹";
+  leftToggle.setAttribute("aria-expanded", String(!collapsed));
+  window.dispatchEvent(new Event("resize"));
+  setTimeout(() => window.dispatchEvent(new Event("resize")), 320);
+});
+
 // --------------------------------------------------------------------------- //
 // Conversations pane                                                          //
 // --------------------------------------------------------------------------- //
@@ -228,7 +255,7 @@ function sentimentClass(s) {
 
 function renderConversations() {
   const list = $("#conversations-list");
-  const convs = state.patient.conversations || [];
+  const convs = (state.patient && state.patient.conversations) || [];
   list.innerHTML = convs
     .map((c) => {
       const sig = c.signals || {};
@@ -283,7 +310,7 @@ const PORTAL_STATUS = {
 
 function renderPortal() {
   const list = $("#portal-list");
-  const items = (state.patient.portal_interactions || [])
+  const items = ((state.patient && state.patient.portal_interactions) || [])
     .slice()
     .sort((a, b) => (a.date < b.date ? 1 : -1)); // newest first
   if (!items.length) {
@@ -351,7 +378,7 @@ function renderAnatomy() {
 // --------------------------------------------------------------------------- //
 // Context package drawer                                                      //
 // --------------------------------------------------------------------------- //
-$("#package-btn").addEventListener("click", openPackage);
+$("#package-btn")?.addEventListener("click", openPackage);
 $("#drawer-close").addEventListener("click", closePackage);
 $("#scrim").addEventListener("click", closePackage);
 document.querySelectorAll(".toggle").forEach((t) =>

@@ -10,6 +10,7 @@ the brain regions-of-concern dots authored per patient.
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -141,8 +142,37 @@ def list_records() -> list[dict[str, Any]]:
             "gender": rec["gender"],
             "encounters": len(rec["encounters"]),
             "headline": _headline(conds),
+            # Lightweight encounter timeline (dates + type) for the patient chooser.
+            "timeline": [
+                {
+                    "date": (e.get("date") or "")[:10],
+                    "title": e.get("visit_title") or e.get("visit_type") or "Encounter",
+                    "type": _visit_category(e),
+                }
+                for e in rec["encounters"]
+                if e.get("date")
+            ],
         })
     return out
+
+
+def _visit_category(enc: dict) -> str:
+    """Coarse encounter category for timeline marker color.
+
+    Prefer the human ``visit_title``; fall back to ``visit_type`` with its
+    SNOMED qualifier stripped (e.g. "...(procedure)") so the qualifier doesn't
+    falsely match the procedure bucket.
+    """
+    title = (enc.get("visit_title") or "").lower()
+    vtype = re.sub(r"\(.*?\)", "", enc.get("visit_type") or "").lower()
+    text = title or vtype
+    if any(k in text for k in ("emergency", "ed visit", " ed ", "acute", "urgent", "stroke", "infarction")):
+        return "acute"
+    if any(k in text for k in ("admission", "inpatient", "hospital", "snf", "discharge")):
+        return "hospitalization"
+    if any(k in text for k in ("surgery", "operation", "cath", "stent", "replacement", "biopsy", "angioplasty")):
+        return "procedure"
+    return "routine"
 
 
 def _headline(condition_labels: list[str]) -> str:
