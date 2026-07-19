@@ -2,7 +2,7 @@
 
 const $ = (sel) => document.querySelector(sel);
 
-const state = { patient: null, package: null, view: "without", record: null, regions: [], selectedFolder: null };
+const state = { patient: null, package: null, view: "without", record: null, regions: [], selectedFolder: null, middleZone: null };
 
 // --------------------------------------------------------------------------- //
 // Auth (mock)                                                                 //
@@ -80,7 +80,10 @@ function selectPatient(folder) {
   // Switching patient hides any revealed record until HORIZON is re-downloaded.
   state.record = null;
   state.regions = [];
+  state.middleZone = null;
   $("#pane-record").classList.add("hidden");
+  renderConversations();
+  renderPortal();
   renderAnatomy();
 }
 
@@ -92,15 +95,19 @@ $("#download-btn").addEventListener("click", downloadHorizon);
 async function downloadHorizon() {
   const folder = state.selectedFolder;
   if (!folder) return;
-  const [rec, regions] = await Promise.all([
+  const [rec, regions, middleZone] = await Promise.all([
     fetch(`/api/records/${folder}`).then((r) => r.json()),
     fetch(`/api/records/${folder}/regions`).then((r) => r.json()),
+    fetch(`/api/records/${folder}/middle-zone`).then((r) => r.json()),
   ]);
   // Gate the render behind the simulated "HORIZON context" download.
   openHorizon(rec, () => {
     state.record = rec;
     state.regions = regions || [];
+    state.middleZone = middleZone || { conversations: [], portal: [] };
     renderRecord();
+    renderConversations(); // middle zone restored
+    renderPortal();
     $("#pane-record").classList.remove("hidden");
     $("#organ-select").value = "brain"; // regions live on the brain
     renderAnatomy();
@@ -245,93 +252,75 @@ leftToggle.addEventListener("click", () => {
 });
 
 // --------------------------------------------------------------------------- //
-// Conversations pane                                                          //
+// Middle-zone panes (Conversations + Portal) — from data/middle-zone           //
 // --------------------------------------------------------------------------- //
-const SRC_ICON = { Claude: "✦", ChatGPT: "◍", "Care team call": "📞" };
-
-function sentimentClass(s) {
-  return s === "negative" ? "neg" : s === "positive" ? "pos" : "";
-}
+// signal_value -> chip class (how much the signal matters to the clinical goal)
+const SIGNAL_CLASS = { high: "neg", moderate: "warn", low: "muted" };
+const SIGNAL_LABEL = { high: "high signal", moderate: "moderate", low: "low" };
+const PROMPT = `<p class="empty">Download HORIZON to restore the middle zone.</p>`;
 
 function renderConversations() {
   const list = $("#conversations-list");
-  const convs = (state.patient && state.patient.conversations) || [];
+  if (!state.record) { list.innerHTML = PROMPT; return; }
+  const convs = (state.middleZone && state.middleZone.conversations) || [];
+  if (!convs.length) { list.innerHTML = `<p class="empty">No between-visit conversations.</p>`; return; }
   list.innerHTML = convs
     .map((c) => {
-      const sig = c.signals || {};
-      const icon = SRC_ICON[c.source] || (c.type === "phone" ? "📞" : "💬");
-      const eng = Math.round((sig.engagement || 0) * 100);
-      const needs = (sig.needs || []).map((n) => `<span class="chip">${n}</span>`).join("");
-      const affectSub =
-        c.type === "phone"
-          ? `<div class="sub"><h4>Affect</h4>
-               <span class="chip affect">${c.affect || "—"}</span>
-               <span class="chip ${sentimentClass(sig.sentiment)}">${sig.sentiment || ""}</span>
-               <div class="meter"><i style="width:${eng}%"></i></div>
-               <div class="chips" style="margin-top:8px">${needs}</div>
-             </div>`
-          : `<div class="sub"><h4>Signals</h4>
-               <span class="chip affect">${c.affect || "—"}</span>
-               <span class="chip ${sentimentClass(sig.sentiment)}">${sig.sentiment || ""}</span>
-               <div class="chips" style="margin-top:8px">${needs}</div>
-             </div>`;
+      const sigCls = SIGNAL_CLASS[c.signal_value] || "muted";
       return `
         <details class="conv">
           <summary>
             <span class="chev">▶</span>
-            <span class="src-icon">${icon}</span>
-            <span class="src-name">${c.source}</span>
-            <span class="src-meta">${c.date}</span>
+            <span class="src-icon">${c.icon || (c.type === "chat" ? "💬" : "📞")}</span>
+            <span class="src-name">${escapeHtml(c.source)}</span>
+            <span class="src-meta">${escapeHtml(c.date)}</span>
           </summary>
           <div class="conv-body">
-            <div class="sub"><h4>Transcript</h4>
+            <div class="mz-title">${escapeHtml(c.title)}
+              <span class="chip ${sigCls}">${SIGNAL_LABEL[c.signal_value] || "low"}</span>
+            </div>
+            <div class="sub"><h4>${c.type === "chat" ? "Session" : "Transcript"}</h4>
               <div class="transcript">${escapeHtml(c.transcript || "")}</div>
             </div>
-            ${affectSub}
+            <div class="sub"><h4>Middle-zone signal</h4>
+              ${c.intent ? `<div class="mz-line"><b>Intent</b> ${escapeHtml(c.intent)}</div>` : ""}
+              ${c.needs ? `<div class="mz-line"><b>Needs</b> ${escapeHtml(c.needs)}</div>` : ""}
+              ${c.sentiment ? `<div class="mz-line"><b>Sentiment</b> ${escapeHtml(c.sentiment)}</div>` : ""}
+              ${c.journey_position ? `<div class="mz-line"><b>Position</b> ${escapeHtml(c.journey_position)}</div>` : ""}
+            </div>
           </div>
         </details>`;
     })
     .join("");
-  if (!convs.length) list.innerHTML = `<p class="empty">No conversations.</p>`;
 }
-
-// --------------------------------------------------------------------------- //
-// Portal Interactions pane                                                    //
-// --------------------------------------------------------------------------- //
-const PORTAL_ICON = {
-  message: "✉️", refill: "💊", result: "🧪",
-  appointment: "📅", form: "📝", billing: "💳",
-};
-const PORTAL_STATUS = {
-  pending: "warn", "awaiting-response": "warn",
-  responded: "pos", completed: "pos", scheduled: "pos",
-  viewed: "muted",
-};
 
 function renderPortal() {
   const list = $("#portal-list");
-  const items = ((state.patient && state.patient.portal_interactions) || [])
-    .slice()
-    .sort((a, b) => (a.date < b.date ? 1 : -1)); // newest first
-  if (!items.length) {
-    list.innerHTML = `<p class="empty">No portal interactions.</p>`;
-    return;
-  }
+  if (!state.record) { list.innerHTML = PROMPT; return; }
+  const items = (state.middleZone && state.middleZone.portal) || [];
+  if (!items.length) { list.innerHTML = `<p class="empty">No portal interactions.</p>`; return; }
   list.innerHTML = items
+    .slice()
+    .sort((a, b) => (a.date < b.date ? 1 : -1)) // newest first
     .map((it) => {
-      const cls = PORTAL_STATUS[it.status] || "muted";
-      const dir = it.direction === "outbound" ? "Patient → system" : "System → patient";
+      const sigCls = SIGNAL_CLASS[it.signal_value] || "muted";
+      const dir =
+        it.direction === "inbound" ? "Patient → system"
+        : it.direction === "passive" ? "Passive / device"
+        : "System → patient";
+      const kind = (it.channel || "").split(".")[1] || "portal";
       return `
         <div class="portal-item">
-          <span class="portal-icon">${PORTAL_ICON[it.type] || "🔔"}</span>
+          <span class="portal-icon">${it.icon || "🔔"}</span>
           <div class="portal-main">
             <div class="portal-top">
               <span class="portal-title">${escapeHtml(it.title)}</span>
-              <span class="chip ${cls}">${escapeHtml(it.status)}</span>
+              <span class="chip ${sigCls}">${SIGNAL_LABEL[it.signal_value] || "low"}</span>
             </div>
-            <p class="portal-detail">${escapeHtml(it.detail || "")}</p>
+            <p class="portal-detail">${escapeHtml(it.transcript || it.detail || "")}</p>
+            ${it.needs ? `<div class="mz-line"><b>Needs</b> ${escapeHtml(it.needs)}</div>` : ""}
             <div class="portal-meta">
-              <span class="portal-type">${escapeHtml(it.type)}</span>
+              <span class="portal-type">${escapeHtml(kind)}</span>
               <span>${escapeHtml(dir)}</span>
               <span>${escapeHtml(it.date)}</span>
             </div>

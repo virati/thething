@@ -66,6 +66,11 @@ def get_regions(folder: str) -> list[dict]:
     return records.load_regions(folder)
 
 
+@app.get("/api/records/{folder}/middle-zone")
+def get_middle_zone(folder: str) -> dict:
+    return records.load_middle_zone(folder)
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
