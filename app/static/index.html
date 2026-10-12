@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <title>HORIZON: Copilot for Non Clinical Context</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <!-- ---------- Auth screen (mock) ---------- -->
+  <section id="auth" class="auth">
+    <div class="auth-card">
+      <div class="brand">
+        <span class="brand-mark">✦</span>
+        <div>
+          <h1>HORIZON: Copilot for Non Clinical Context</h1>
+          <p class="tagline">The agentic advocate that carries your story between visits.</p>
+        </div>
+      </div>
+
+      <div class="consent">
+        <h2>Authorize access</h2>
+        <p>The Advocate will read your conversations and imaging to prepare
+           context for your care team. Nothing is shared without your consent.</p>
+        <ul class="scopes">
+          <li>Care-team call transcripts &amp; affect</li>
+          <li>Claude / ChatGPT health chats</li>
+          <li>Diagnostic imaging (heart / brain)</li>
+        </ul>
+      </div>
+
+      <button id="signin" class="google-btn">
+        <span class="g">G</span> Sign in with Google
+        <span class="connector">· Claude Connector</span>
+      </button>
+      <p class="mock-note">Prototype — mock authorization, no real account is used.</p>
+    </div>
+  </section>
+
+  <!-- ---------- App ---------- -->
+  <main id="app" class="app hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="brand-mark small">✦</span>
+        <strong>HORIZON</strong>
+      </div>
+      <div class="topbar-mid">
+        <span id="active-patient" class="active-patient">No patient selected</span>
+        <button id="download-btn" class="pill" title="Pull this patient's HORIZON context from their phone">⤓ Download HORIZON</button>
+      </div>
+    </header>
+
+    <div class="stage" id="stage">
+      <!-- Main screen: the glass brain (3D anatomy) -->
+      <div id="anatomy" class="anatomy"></div>
+
+      <!-- Collapsible LEFT pop-out: patient chooser as a care-journey timeline -->
+      <button id="left-toggle" class="left-toggle" aria-label="Patients" aria-expanded="true">‹</button>
+      <aside id="left-panel" class="left-panel">
+        <h2 class="left-title">Patients</h2>
+        <p class="left-sub">Pick a care journey. Each marker is a clinical encounter; download HORIZON to restore the middle-zone context between them.</p>
+        <div id="patient-timeline" class="patient-timeline"></div>
+      </aside>
+
+      <!-- Floating organ control -->
+      <div class="stage-controls">
+        <label class="organ-picker">
+          <span class="sr-only">Organ</span>
+          <select id="organ-select">
+            <option value="brain">🧠 Brain</option>
+            <option value="heart">❤ Heart</option>
+          </select>
+        </label>
+        <label class="overlay-toggle" title="Overlay the depression circuit correlome (CBCT circuit map)">
+          <input type="checkbox" id="dz-toggle" /> Depression circuit
+        </label>
+      </div>
+
+      <!-- Collapsible side panel toggle -->
+      <button id="side-toggle" class="side-toggle" aria-label="Collapse panel" aria-expanded="true">›</button>
+
+      <!-- Collapsible side panel: record, conversations, portal, imaging.
+           Each pane is a native <details> accordion (collapsible). -->
+      <aside id="side-panel" class="side-panel">
+        <details class="pane hidden" id="pane-record" open>
+          <summary class="pane-summary">
+            <span class="pane-chev">▶</span>
+            <h2 class="pane-title">Patient Record</h2>
+          </summary>
+          <p class="pane-sub">All information from <code>data/patients</code> — demographics, longitudinal summary, and every encounter's note, transcript &amp; after-visit summary.</p>
+          <div id="record-body"></div>
+        </details>
+
+        <details class="pane" id="pane-conversations" open>
+          <summary class="pane-summary">
+            <span class="pane-chev">▶</span>
+            <h2 class="pane-title">Conversations</h2>
+          </summary>
+          <p class="pane-sub">Phone calls, chatbots — the middle zones between visits.</p>
+          <div id="conversations-list" class="conv-list"></div>
+        </details>
+
+        <details class="pane" id="pane-portal" open>
+          <summary class="pane-summary">
+            <span class="pane-chev">▶</span>
+            <h2 class="pane-title">Portal Interactions</h2>
+          </summary>
+          <p class="pane-sub">Secure messages, refills, released results, scheduling, forms &amp; billing — the patient's touches with the health-system portal.</p>
+          <div id="portal-list" class="portal-list"></div>
+        </details>
+
+        <details class="pane" id="pane-imaging" open>
+          <summary class="pane-summary">
+            <span class="pane-chev">▶</span>
+            <h2 class="pane-title">Imaging / Findings</h2>
+          </summary>
+          <p class="pane-sub">Studies behind the anatomy view.</p>
+          <div id="imaging-notes" class="imaging-notes"></div>
+        </details>
+      </aside>
+    </div>
+  </main>
+
+  <!-- ---------- Context package drawer ---------- -->
+  <aside id="drawer" class="drawer hidden" aria-hidden="true">
+    <div class="drawer-inner">
+      <div class="drawer-head">
+        <h2>Context package for the clinician</h2>
+        <button id="drawer-close" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="toggle-row">
+        <button class="toggle active" data-view="without">Without middle zones</button>
+        <button class="toggle" data-view="with">With middle zones</button>
+      </div>
+      <div id="package-body" class="package-body"></div>
+    </div>
+  </aside>
+  <div id="scrim" class="scrim hidden"></div>
+
+  <!-- ---------- HORIZON context download modal ---------- -->
+  <div id="horizon-modal" class="hz-modal hidden" aria-hidden="true">
+    <div class="hz-card">
+      <div class="hz-brand">◇ HORIZON</div>
+      <h2 id="hz-title">Patient</h2>
+      <p class="hz-sub">Pulling cross-system context from the patient's phone…</p>
+      <div id="hz-progress" class="hz-progress hidden">
+        <div class="hz-bar"><i id="hz-bar-fill"></i></div>
+        <div id="hz-status" class="hz-status">Connecting…</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/vendor/three.min.js"></script>
+  <script src="/static/vendor/OrbitControls.js"></script>
+  <script src="/static/vendor/GLTFLoader.js"></script>
+  <script src="/static/anatomy3d.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
